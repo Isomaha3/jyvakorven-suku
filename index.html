@@ -529,7 +529,7 @@ function renderHero() {
   const oldest = ids.filter(i => P[i].birthYear).sort(byYear)[0];
   const towns = new Set(ids.map(i => parish(P[i].birthPlace || P[i].from)).filter(Boolean));
   document.getElementById("intro").textContent =
-    (root.living ? "Sukupuu lähtee liikkeelle Juusosta, jonka tiedot on piilotettu tästä julkisesta versiosta. " : `${fullName(root)} syntyi ${root.birth} ${root.birthPlace}ssa. `) + `Isän suku on Tampereen seudulta (Tampere, Teisko, Kuru, Ikaalinen) ja Kiimingistä. Äidin isän Karellit ovat Pielavedeltä ja äidin äidin Loposet Karjalan kannakselta Viipurin seudulta. Vanhimmat merkinnät ovat 1500-luvun verokirjoista: Ikaalisten Jämijärven Soinin ja Juhtimäen Kestilän isännät.`;
+    (root.living ? "" : `${fullName(root)} syntyi ${root.birth} ${root.birthPlace}ssa. `) + `Isän suku on Tampereen seudulta (Tampere, Teisko, Kuru, Ikaalinen) ja Kiimingistä. Äidin isän Karellit ovat Pielavedeltä ja äidin äidin Loposet Karjalan kannakselta Viipurin seudulta. Vanhimmat merkinnät ovat 1500-luvun verokirjoista: Ikaalisten Jämijärven Soinin ja Juhtimäen Kestilän isännät.`;
   document.getElementById("stats").innerHTML = [
     [ids.length, "henkilöä puussa"],
     [depth(HOME) + 1, `sukupolvea · ${certainDepth(HOME) + 1} varmistettua`],
