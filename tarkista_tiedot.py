@@ -20,6 +20,69 @@ def lue_data(polku):
     return data
 
 
+def lue_tarinat(polku):
+    """Sivun näkyvä teksti ennen DATA-objektia, HTML-tagit poistettuna."""
+    html = open(polku, encoding="utf-8").read()
+    teksti = html[: html.index("const DATA = ")]
+    return re.sub(r"<[^>]+>", " ", teksti)
+
+
+def tarkka_syntyma(p):
+    """True, jos syntymä on tarkka päivämäärä eikä arvio (n. 1724)."""
+    return bool(re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}", str(p.get("birth") or "").strip()))
+
+
+def ika_huomiot(P, nimi):
+    """Vertaa muistiinpanojen ikämainintoja syntymävuoteen.
+
+    'täytti 70 vuotta ... 27.2.1922' -> syntymävuoden pitäisi olla 1852.
+    'kuoli ... 76-vuotiaana' -> syntymävuosi kuolinvuosi-76 tai -77, yhden vuoden
+    heitolla (haudattujen iät ovat kirkonkirjoissa usein epätarkkoja).
+    Vain tarkat syntymäpäivät tarkistetaan; arviot (n. 1724) ohitetaan.
+    """
+    out = []
+    for pid, p in P.items():
+        sv, kv, note = p.get("birthYear"), p.get("deathYear"), p.get("note") or ""
+        if not sv or not tarkka_syntyma(p):
+            continue
+        for lause in re.split(r"(?<=[.;])\s+(?=[A-ZÅÄÖ])", note):
+            m = re.search(r"[Tt]äytti (\d{1,3}) vuotta", lause)
+            if m:
+                y = re.findall(r"\b(1[6-9]\d\d|20\d\d)\b", lause[m.end():])
+                if y and int(y[0]) - int(m.group(1)) != sv:
+                    out.append(f"IKÄ/TEKSTI: {nimi(pid)} s. {p['birth']}, mutta muistiinpanossa "
+                               f"'täytti {m.group(1)} vuotta' vuonna {y[0]} (-> s. {int(y[0]) - int(m.group(1))})")
+            m = re.search(r"(\d{1,3})-vuotiaana", lause)
+            if m and kv and "kuoli" in lause.lower():
+                ika = int(m.group(1))
+                # Haudattujen ikä on kirjoissa usein vuoden pielessä, joten
+                # sallitaan yhden vuoden heitto laskennallisesta iästä.
+                if not kv - ika - 2 <= sv <= kv - ika + 1:
+                    out.append(f"IKÄ/TEKSTI: {nimi(pid)} s. {sv}, k. {kv}, mutta muistiinpanossa {ika}-vuotiaana")
+    return out
+
+
+def tarina_huomiot(P, tarinat, nimi):
+    """Etsii tarinoista muodot 'Josef (1852–1925)' ja vertaa niitä tietoihin.
+
+    Henkilö katsotaan samaksi, kun etunimi täsmää ja toinen vuosista täsmää.
+    Silloin toisen vuoden ero on todennäköinen ristiriita.
+    """
+    out = []
+    for m in re.finditer(r"([A-ZÅÄÖ][a-zåäö]+) \((1\d{3})[–-](1\d{3})\)", tarinat):
+        etu, s, k = m.group(1), int(m.group(2)), int(m.group(3))
+        for pid, p in P.items():
+            nimet = re.findall(r"[A-ZÅÄÖ][a-zåäö]+", p.get("given", ""))
+            if etu not in nimet:
+                continue
+            sv, kv = p.get("birthYear"), p.get("deathYear")
+            if sv == s and kv and kv != k:
+                out.append(f"TARINA: '{m.group(0)}', mutta {nimi(pid)} k. {kv}")
+            elif kv == k and sv and sv != s:
+                out.append(f"TARINA: '{m.group(0)}', mutta {nimi(pid)} s. {p.get('birth') or sv}")
+    return out
+
+
 def vuosi(teksti):
     """Ensimmäinen nelinumeroinen vuosi (vaihteluvälissä 'n. 1560–1580' alaraja)."""
     if not teksti:
@@ -94,6 +157,9 @@ def main():
             muut.append(f"SUKUPUOLI: perheen {fid} isä {nimi(h)} on merkitty naiseksi")
         if w in P and P[w]["sex"] == "M":
             muut.append(f"SUKUPUOLI: perheen {fid} äiti {nimi(w)} on merkitty mieheksi")
+
+    muut += ika_huomiot(P, nimi)
+    muut += tarina_huomiot(P, lue_tarinat(TIEDOSTO), nimi)
 
     ryhmat = defaultdict(list)
     for pid, p in P.items():
